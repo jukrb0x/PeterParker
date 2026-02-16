@@ -3,9 +3,10 @@
  * Manages active scan state and progress
  */
 
-import type { ScanConfig, ScanProgress, ScanStatus, ScanResult } from '$lib/scanner/types';
+import type { ScanConfig, ScanProgress, ScanStatus, ScanResult, Device } from '$lib/scanner/types';
 import { scannerClient } from '$lib/scanner/client';
 import { devicesStore } from './devices.svelte';
+import { browser } from '$app/environment';
 
 export type { ScanConfig, ScanProgress };
 
@@ -30,6 +31,7 @@ class ScanStore {
 	);
 
 	private pollInterval: ReturnType<typeof setInterval> | null = null;
+	private unlistenFns: (() => void)[] = [];
 
 	async start(config: ScanConfig): Promise<void> {
 		this.isStarting = true;
@@ -39,6 +41,11 @@ class ScanStore {
 		try {
 			this.scanId = await scannerClient.startScan(config);
 			this.config = config;
+			
+			// Set up event listeners for Tauri
+			await this.setupEventListeners();
+			
+			// Also start polling as fallback
 			this.startPolling();
 		} catch (e) {
 			this.error = e instanceof Error ? e.message : 'Failed to start scan';
@@ -47,11 +54,91 @@ class ScanStore {
 		}
 	}
 
+	private async setupEventListeners(): Promise<void> {
+		if (!browser) return;
+		
+		// Check if we're in Tauri environment
+		if (!('__TAURI__' in window)) return;
+		
+		try {
+			const { listen } = await import('@tauri-apps/api/event');
+			
+			// Listen for scan progress events
+			const unlistenProgress = await listen<{
+				scanId: string;
+				scanned: number;
+				total: number;
+				found: number;
+				current: string | null;
+			}>('scan-progress', (event) => {
+				if (event.payload.scanId !== this.scanId) return;
+				
+				this.progress = {
+					scanId: event.payload.scanId,
+					status: 'running',
+					totalHosts: event.payload.total,
+					scannedHosts: event.payload.scanned,
+					foundDevices: event.payload.found,
+					currentHost: event.payload.current,
+					eta: null,
+					error: null
+				};
+			});
+			this.unlistenFns.push(unlistenProgress);
+			
+			// Listen for device found events
+			const unlistenDevice = await listen<{
+				scanId: string;
+				device: Device;
+			}>('device-found', (event) => {
+				if (event.payload.scanId !== this.scanId) return;
+				devicesStore.add(event.payload.device);
+			});
+			this.unlistenFns.push(unlistenDevice);
+			
+			// Listen for scan completion
+			const unlistenCompleted = await listen<{
+				scanId: string;
+				devices: number;
+			}>('scan-completed', async (event) => {
+				if (event.payload.scanId !== this.scanId) return;
+				
+				this.stopPolling();
+				await this.loadResult();
+			});
+			this.unlistenFns.push(unlistenCompleted);
+			
+			// Listen for errors
+			const unlistenError = await listen<{
+				scanId: string;
+				error: string;
+			}>('scan-error', (event) => {
+				if (event.payload.scanId !== this.scanId) return;
+				
+				this.error = event.payload.error;
+				this.stopPolling();
+			});
+			this.unlistenFns.push(unlistenError);
+			
+		} catch (e) {
+			console.warn('Failed to set up Tauri event listeners:', e);
+		}
+	}
+
+	private cleanupEventListeners(): void {
+		for (const unlisten of this.unlistenFns) {
+			unlisten();
+		}
+		this.unlistenFns = [];
+	}
+
 	async pause(): Promise<void> {
 		if (!this.scanId || !this.isScanning) return;
 		try {
 			await scannerClient.pauseScan(this.scanId);
-			await this.updateProgress();
+			if (this.progress) {
+				this.progress = { ...this.progress, status: 'paused' };
+			}
 		} catch (e) {
 			this.error = e instanceof Error ? e.message : 'Failed to pause scan';
 		}
@@ -61,7 +148,9 @@ class ScanStore {
 		if (!this.scanId || !this.isPaused) return;
 		try {
 			await scannerClient.resumeScan(this.scanId);
-			await this.updateProgress();
+			if (this.progress) {
+				this.progress = { ...this.progress, status: 'running' };
+			}
 		} catch (e) {
 			this.error = e instanceof Error ? e.message : 'Failed to resume scan';
 		}
@@ -71,10 +160,7 @@ class ScanStore {
 		if (!this.scanId) return;
 		try {
 			await scannerClient.cancelScan(this.scanId);
-			this.stopPolling();
-			this.scanId = null;
-			this.progress = null;
-			this.config = null;
+			this.cleanup();
 		} catch (e) {
 			this.error = e instanceof Error ? e.message : 'Failed to cancel scan';
 		}
@@ -113,6 +199,7 @@ class ScanStore {
 				this.progress.status === 'error'
 			) {
 				this.stopPolling();
+				this.cleanupEventListeners();
 				if (this.progress.status === 'completed') {
 					await this.loadResult();
 				}
@@ -134,12 +221,17 @@ class ScanStore {
 		}
 	}
 
-	reset(): void {
+	private cleanup(): void {
 		this.stopPolling();
+		this.cleanupEventListeners();
 		this.scanId = null;
 		this.config = null;
 		this.progress = null;
 		this.result = null;
+	}
+
+	reset(): void {
+		this.cleanup();
 		this.error = null;
 	}
 }
