@@ -2,7 +2,6 @@
 
 Your friendly neighborhood network scanner. Discover devices on your local network with detailed information including MAC addresses, vendors, open ports, and more.
 
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ## Features
