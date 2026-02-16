@@ -19,6 +19,7 @@ pub enum DeviceType {
     Camera,
     Tv,
     GameConsole,
+    Server,
     Unknown,
 }
 
@@ -43,6 +44,7 @@ impl std::fmt::Display for DeviceType {
             DeviceType::Camera => write!(f, "Camera"),
             DeviceType::Tv => write!(f, "TV"),
             DeviceType::GameConsole => write!(f, "Game Console"),
+            DeviceType::Server => write!(f, "Server"),
             DeviceType::Unknown => write!(f, "Unknown"),
         }
     }

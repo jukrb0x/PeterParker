@@ -6,7 +6,18 @@ pub use engine::*;
 pub use tcp::*;
 pub use http::*;
 
-use std::net::{Ipv4Addr, AddrParseError};
+use std::net::Ipv4Addr;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ParseError {
+    #[error("invalid IP range format")]
+    InvalidFormat,
+    #[error("invalid IP address")]
+    InvalidIp(#[from] std::net::AddrParseError),
+    #[error("invalid prefix")]
+    InvalidPrefix,
+}
 
 #[derive(Debug, Clone)]
 pub struct IpRange {
@@ -15,14 +26,14 @@ pub struct IpRange {
 }
 
 impl IpRange {
-    pub fn parse(s: &str) -> Result<Self, AddrParseError> {
+    pub fn parse(s: &str) -> Result<Self, ParseError> {
         let parts: Vec<&str> = s.split('/').collect();
         if parts.len() != 2 {
-            return Err(AddrParseError);
+            return Err(ParseError::InvalidFormat);
         }
         
         let network: Ipv4Addr = parts[0].parse()?;
-        let prefix: u8 = parts[1].parse().map_err(|_| AddrParseError)?;
+        let prefix: u8 = parts[1].parse().map_err(|_| ParseError::InvalidPrefix)?;
         
         Ok(Self { network, prefix })
     }

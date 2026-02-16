@@ -6,12 +6,12 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:web": "pnpm --filter @peterparker/web dev",
+    "dev:tauri": "pnpm --filter @peterparker/tauri tauri dev",
     "test": "turbo run test",
     "test:run": "turbo run test:run",
     "lint": "turbo run lint",
-    "format": "turbo run format",
-    "tauri:dev": "pnpm --filter @peterparker/tauri dev",
-    "tauri:build": "pnpm --filter @peterparker/tauri build"
+    "format": "turbo run format"
   },
   "devDependencies": {
     "turbo": "^2.0.0"

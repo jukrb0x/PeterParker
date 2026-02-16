@@ -337,7 +337,7 @@ pub fn lookup_vendor(mac: &str) -> Option<&'static str> {
     // Normalize MAC to uppercase with colons
     let normalized = mac
         .to_uppercase()
-        .replace('-', ":')
+        .replace('-', ":")
         .replace('.', ":");
     
     // Extract first 3 octets
@@ -354,16 +354,16 @@ pub fn lookup_vendor(mac: &str) -> Option<&'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_lookup_apple() {
-        let vendor = lookup_vendor("00:1B:63:XX:XX:XX");
+        let vendor = lookup_vendor("00:1B:63:00:00:00");
         assert_eq!(vendor, Some("Apple"));
     }
-    
+
     #[test]
     fn test_lookup_xiaomi() {
-        let vendor = lookup_vendor("28:ED:6A:XX:XX:XX");
+        let vendor = lookup_vendor("28:ED:6A:00:00:00");
         assert_eq!(vendor, Some("Xiaomi"));
     }
 }

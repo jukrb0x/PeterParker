@@ -124,7 +124,7 @@ async fn tcp_scan_ports(host: &str, ports: &[u16], timeout: Duration) -> Vec<Por
                 let timeout = timeout;
                 move || {
                     TcpStream::connect_timeout(
-                        &addr.to_socket_addrs()?.next()?,
+                        &addr.to_socket_addrs().ok()?.next()?,
                         timeout,
                     ).ok()
                 }

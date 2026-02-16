@@ -13,12 +13,12 @@ pub async fn tcp_scan_ports(host: &str, ports: &[u16], timeout: Duration) -> Vec
             timeout,
             tokio::task::spawn_blocking(move || {
                 TcpStream::connect_timeout(
-                    &addr.to_socket_addrs()?.next().unwrap(),
+                    &addr.to_socket_addrs().ok()?.next()?,
                     timeout,
-                )
+                ).ok()
             })
         ).await {
-            Ok(Ok(Ok(_))) => {
+            Ok(Ok(Some(_))) => {
                 open_ports.push(Port::open_tcp(*port));
             }
             _ => continue,
@@ -30,14 +30,15 @@ pub async fn tcp_scan_ports(host: &str, ports: &[u16], timeout: Duration) -> Vec
 
 pub async fn grab_banner(host: &str, port: u16, timeout: Duration) -> Option<String> {
     let addr = format!("{}:{}", host, port);
+    let host = host.to_string();
     
     let result = tokio::time::timeout(
         timeout,
         tokio::task::spawn_blocking(move || {
             let mut stream = TcpStream::connect_timeout(
-                &addr.to_socket_addrs()?.next()?,
+                &addr.to_socket_addrs().ok()?.next()?,
                 timeout,
-            )?;
+            ).ok()?;
             
             use std::io::{Read, Write};
             
