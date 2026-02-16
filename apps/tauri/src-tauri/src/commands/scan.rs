@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use tauri::State;
+use uuid::Uuid;
 
 use peterparker_core::models::{ScanConfig, ScanProgress, ScanResult, ScanStatus};
 use peterparker_core::scanner::ScannerEngine;
@@ -12,7 +13,7 @@ pub async fn start_scan(
     scan_store: State<'_, ScanStore>,
     device_store: State<'_, DeviceStore>,
 ) -> Result<String, String> {
-    let scan_id = uuid::Uuid::new_v4().to_string();
+    let scan_id = Uuid::new_v4().to_string();
     
     let range = peterparker_core::scanner::IpRange::parse(&config.target_range)
         .map_err(|_| format!("Invalid IP range: {}", config.target_range))?;
