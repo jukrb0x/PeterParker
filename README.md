@@ -174,6 +174,6 @@ MIT
 
 ## Acknowledgments
 
-- MAC vendor database from [Wireshark](https://gitlab.com/wireshark/wireshark/-/raw/master/manuf)
+- MAC vendor database from [Wireshark](https://www.wireshark.org/download/automated/data/manuf)
 - UI components from [shadcn-svelte](https://www.shadcn-svelte.com/)
 - Built with [Tauri](https://tauri.app/) and [SvelteKit](https://kit.svelte.dev/)
