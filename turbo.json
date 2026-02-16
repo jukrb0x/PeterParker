@@ -4,7 +4,23 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".svelte-kit/**", "dist/**", "build/**", "target/**"]
+      "outputs": [".svelte-kit/**", "dist/**", "build/**", "src-tauri/target/**"]
+    },
+    "build:mac": {
+      "dependsOn": ["^build"],
+      "outputs": ["src-tauri/target/**"]
+    },
+    "build:win": {
+      "dependsOn": ["^build"],
+      "outputs": ["src-tauri/target/**"]
+    },
+    "build:linux": {
+      "dependsOn": ["^build"],
+      "outputs": ["src-tauri/target/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
     },
     "test": {
       "dependsOn": ["build"]
@@ -12,10 +28,12 @@
     "test:run": {
       "dependsOn": ["build"]
     },
-    "lint": {},
-    "dev": {
-      "cache": false,
-      "persistent": true
-    }
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "check": {
+      "dependsOn": ["^check"]
+    },
+    "format": {}
   }
 }
