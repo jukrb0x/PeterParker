@@ -42,17 +42,23 @@ pub struct ScanConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PortSelection {
+    Named(PortSelectionNamed),
+    Custom(Vec<u16>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum PortSelectionNamed {
     Top100,
     Top1000,
     All,
-    Custom(Vec<u16>),
 }
 
 impl Default for ScanConfig {
     fn default() -> Self {
         Self {
             target_range: "192.168.1.0/24".to_string(),
-            ports: PortSelection::Top100,
+            ports: PortSelection::Named(PortSelectionNamed::Top100),
             scan_type: ScanMethod::Comprehensive,
             timeout: 2000,
             concurrency: 50,

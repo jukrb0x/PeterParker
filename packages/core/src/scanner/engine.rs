@@ -61,9 +61,9 @@ impl ScannerEngine {
         
         // Determine ports to scan
         let ports: Vec<u16> = match &self.config.ports {
-            crate::models::PortSelection::Top100 => crate::models::port::TOP_PORTS[..20].to_vec(), // Scan fewer for speed
-            crate::models::PortSelection::Top1000 => crate::models::port::TOP_PORTS[..50].to_vec(),
-            crate::models::PortSelection::All => (1..=1000).collect(), // Cap at 1000 for performance
+            crate::models::PortSelection::Named(crate::models::PortSelectionNamed::Top100) => crate::models::port::TOP_PORTS[..20].to_vec(), // Scan fewer for speed
+            crate::models::PortSelection::Named(crate::models::PortSelectionNamed::Top1000) => crate::models::port::TOP_PORTS[..50].to_vec(),
+            crate::models::PortSelection::Named(crate::models::PortSelectionNamed::All) => (1..=1000).collect(), // Cap at 1000 for performance
             crate::models::PortSelection::Custom(p) => p.clone(),
         };
         
