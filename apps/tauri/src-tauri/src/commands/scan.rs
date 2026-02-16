@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use tauri::State;
 use uuid::Uuid;
 
@@ -28,11 +27,11 @@ pub async fn start_scan(
     let config_clone = config.clone();
     
     tokio::spawn(async move {
-        let engine = ScannerEngine::new(config_clone);
+        let engine = ScannerEngine::new(config_clone.clone());
         let mut result = ScanResult::new(scan_id_clone.clone(), config_clone);
         
-        if let Some((p, _)) = scan_store_clone.get_mut(&scan_id_clone) {
-            p.status = ScanStatus::Running;
+        if let Some(mut entry) = scan_store_clone.get_mut(&scan_id_clone) {
+            entry.0.status = ScanStatus::Running;
         }
         
         match engine.scan_range(range).await {
@@ -45,21 +44,21 @@ pub async fn start_scan(
                     if let Some(existing) = store.iter_mut().find(|d| d.ip == device.ip) {
                         *existing = device.clone();
                     } else {
-                        store.push(device);
+                        store.push(device.clone());
                     }
                 }
                 
-                if let Some((p, r)) = scan_store_clone.get_mut(&scan_id_clone) {
-                    p.status = ScanStatus::Completed;
-                    p.scanned_hosts = p.total_hosts;
-                    p.found_devices = result.devices.len() as u32;
-                    *r = Some(result);
+                if let Some(mut entry) = scan_store_clone.get_mut(&scan_id_clone) {
+                    entry.0.status = ScanStatus::Completed;
+                    entry.0.scanned_hosts = entry.0.total_hosts;
+                    entry.0.found_devices = result.devices.len() as u32;
+                    entry.1 = Some(result);
                 }
             }
             Err(e) => {
-                if let Some((p, _)) = scan_store_clone.get_mut(&scan_id_clone) {
-                    p.status = ScanStatus::Error;
-                    p.error = Some(e.to_string());
+                if let Some(mut entry) = scan_store_clone.get_mut(&scan_id_clone) {
+                    entry.0.status = ScanStatus::Error;
+                    entry.0.error = Some(e.to_string());
                 }
             }
         }

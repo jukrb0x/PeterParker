@@ -61,10 +61,8 @@ async fn quick_scan_ports(ip: &str, ports: &[u16]) -> Vec<Port> {
                 let addr = addr.clone();
                 let timeout = timeout;
                 move || {
-                    TcpStream::connect_timeout(
-                        &addr.to_socket_addrs()?.next().unwrap(),
-                        timeout,
-                    ).ok()
+                    let sock_addr = addr.to_socket_addrs().ok()?.next()?;
+                    TcpStream::connect_timeout(&sock_addr, timeout).ok()
                 }
             })
         ).await {
