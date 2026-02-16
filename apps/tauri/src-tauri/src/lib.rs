@@ -33,12 +33,12 @@ pub fn run() {
             commands::scan::resume_scan,
             commands::scan::cancel_scan,
             commands::scan::get_scan_result,
-            commands::device::get_devices,
-            commands::device::get_device,
-            commands::device::delete_device,
-            commands::device::rescan_device,
-            commands::device::export_devices,
-            commands::network::get_network_info,
+            commands::scan::get_devices,
+            commands::scan::get_device,
+            commands::scan::delete_device,
+            commands::scan::rescan_device,
+            commands::scan::export_devices,
+            commands::scan::get_network_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
