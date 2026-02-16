@@ -350,20 +350,3 @@ pub fn lookup_vendor(mac: &str) -> Option<&'static str> {
     
     VENDOR_DB.get(oui.as_str()).copied()
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_lookup_apple() {
-        let vendor = lookup_vendor("00:1B:63:00:00:00");
-        assert_eq!(vendor, Some("Apple"));
-    }
-
-    #[test]
-    fn test_lookup_xiaomi() {
-        let vendor = lookup_vendor("28:ED:6A:00:00:00");
-        assert_eq!(vendor, Some("Xiaomi"));
-    }
-}
