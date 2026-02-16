@@ -1,16 +1,24 @@
 pub mod engine;
 pub mod tcp;
 pub mod http;
+pub mod arp;
 
 pub use engine::*;
 pub use tcp::*;
 pub use http::*;
+pub use arp::*;
 
 use std::net::Ipv4Addr;
 use thiserror::Error;
 
+#[derive(Debug, Clone)]
+pub struct IpRange {
+    network: Ipv4Addr,
+    prefix: u8,
+}
+
 #[derive(Error, Debug)]
-pub enum ParseError {
+pub enum IpRangeError {
     #[error("invalid IP range format")]
     InvalidFormat,
     #[error("invalid IP address")]
@@ -19,21 +27,19 @@ pub enum ParseError {
     InvalidPrefix,
 }
 
-#[derive(Debug, Clone)]
-pub struct IpRange {
-    network: Ipv4Addr,
-    prefix: u8,
-}
-
 impl IpRange {
-    pub fn parse(s: &str) -> Result<Self, ParseError> {
+    pub fn parse(s: &str) -> Result<Self, IpRangeError> {
         let parts: Vec<&str> = s.split('/').collect();
         if parts.len() != 2 {
-            return Err(ParseError::InvalidFormat);
+            return Err(IpRangeError::InvalidFormat);
         }
         
         let network: Ipv4Addr = parts[0].parse()?;
-        let prefix: u8 = parts[1].parse().map_err(|_| ParseError::InvalidPrefix)?;
+        let prefix: u8 = parts[1].parse().map_err(|_| IpRangeError::InvalidPrefix)?;
+        
+        if prefix > 32 {
+            return Err(IpRangeError::InvalidPrefix);
+        }
         
         Ok(Self { network, prefix })
     }
@@ -61,5 +67,20 @@ mod tests {
     fn test_parse_range() {
         let range = IpRange::parse("192.168.1.0/24").unwrap();
         assert_eq!(range.size(), 256);
+    }
+    
+    #[test]
+    fn test_parse_range_invalid() {
+        assert!(IpRange::parse("192.168.1.0").is_err());
+        assert!(IpRange::parse("invalid").is_err());
+        assert!(IpRange::parse("192.168.1.0/33").is_err());
+    }
+    
+    #[test]
+    fn test_hosts() {
+        let range = IpRange::parse("192.168.1.0/24").unwrap();
+        let hosts: Vec<_> = range.hosts().take(5).collect();
+        assert_eq!(hosts[0], Ipv4Addr::new(192, 168, 1, 1));
+        assert_eq!(hosts[4], Ipv4Addr::new(192, 168, 1, 5));
     }
 }
