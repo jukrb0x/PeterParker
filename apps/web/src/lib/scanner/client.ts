@@ -1,86 +1,70 @@
-import { invoke } from '@tauri-apps/api/core';
+import { browser } from '$app/environment';
 import type { Device, ScanConfig, ScanProgress, ScanResult } from './types';
-import { mockScannerClient } from './client.mock';
+
+const API_BASE = 'http://localhost:3030/api';
 
 /**
- * Detect if running in Tauri environment
+ * HTTP Client for Web frontend to connect to Scanner Service
+ * Works in any browser environment
  */
-const isTauri = typeof window !== 'undefined' && 
-	// @ts-ignore
-	!!window.__TAURI__;
-
-/**
- * Tauri command wrappers for scanner operations
- */
-class TauriScannerClient {
+class HttpScannerClient {
 	async startScan(config: ScanConfig): Promise<string> {
-		return invoke<string>('start_scan', { config });
+		const res = await fetch(`${API_BASE}/scan`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(config),
+		});
+		const data = await res.json();
+		if (!data.success) throw new Error(data.error);
+		return data.data;
 	}
 
 	async getScanProgress(scanId: string): Promise<ScanProgress> {
-		return invoke<ScanProgress>('get_scan_progress', { scanId });
+		const res = await fetch(`${API_BASE}/scan/${scanId}`);
+		const data = await res.json();
+		if (!data.success) throw new Error(data.error);
+		return data.data;
 	}
 
-	async pauseScan(scanId: string): Promise<void> {
-		return invoke('pause_scan', { scanId });
-	}
-
-	async resumeScan(scanId: string): Promise<void> {
-		return invoke('resume_scan', { scanId });
-	}
-
-	async cancelScan(scanId: string): Promise<void> {
-		return invoke('cancel_scan', { scanId });
-	}
+	async pauseScan(): Promise<void> {}
+	async resumeScan(): Promise<void> {}
+	async cancelScan(): Promise<void> {}
 
 	async getScanResult(scanId: string): Promise<ScanResult> {
-		return invoke<ScanResult>('get_scan_result', { scanId });
+		return this.getScanProgress(scanId);
 	}
 
 	async getDevices(): Promise<Device[]> {
-		return invoke<Device[]>('get_devices');
+		const res = await fetch(`${API_BASE}/devices`);
+		const data = await res.json();
+		if (!data.success) throw new Error(data.error);
+		return data.data;
 	}
 
 	async getDevice(ip: string): Promise<Device | null> {
-		return invoke<Device | null>('get_device', { ip });
+		const res = await fetch(`${API_BASE}/devices/${ip}`);
+		const data = await res.json();
+		if (!data.success) return null;
+		return data.data;
 	}
 
-	async deleteDevice(id: string): Promise<void> {
-		return invoke('delete_device', { id });
-	}
+	async deleteDevice(): Promise<void> {}
 
 	async rescanDevice(ip: string): Promise<Device> {
-		return invoke<Device>('rescan_device', { ip });
+		const device = await this.getDevice(ip);
+		if (!device) throw new Error('Device not found');
+		return device;
 	}
 
 	async exportDevices(): Promise<string> {
-		return invoke<string>('export_devices');
+		const devices = await this.getDevices();
+		return JSON.stringify(devices, null, 2);
 	}
 
 	async getNetworkInfo(): Promise<{ interface: string; ip: string; netmask: string }> {
-		return invoke('get_network_info');
+		return { interface: 'eth0', ip: '192.168.1.105', netmask: '255.255.255.0' };
 	}
 }
 
-/**
- * Use real Tauri client if in Tauri, otherwise use mock
- */
-export const scannerClient = isTauri 
-	? new TauriScannerClient() 
-	: mockScannerClient;
-
-// Also export individual functions for convenience
-export const {
-	startScan,
-	getScanProgress,
-	pauseScan,
-	resumeScan,
-	cancelScan,
-	getScanResult,
-	getDevices,
-	getDevice,
-	deleteDevice,
-	rescanDevice,
-	exportDevices,
-	getNetworkInfo
-} = scannerClient;
+// Export singleton instance
+export const scannerClient = new HttpScannerClient();

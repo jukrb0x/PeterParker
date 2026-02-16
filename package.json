@@ -6,8 +6,10 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:scanner": "cd apps/scanner && cargo run",
     "dev:web": "pnpm --filter @peterparker/web dev",
     "dev:tauri": "pnpm --filter @peterparker/tauri tauri dev",
+    "dev:fullstack": "pnpm run --parallel dev:scanner dev:web",
     "test": "turbo run test",
     "test:run": "turbo run test:run",
     "lint": "turbo run lint",
