@@ -1,4 +1,4 @@
-# PeterParker - Network Scanner
+# 🕸️ PeterParker - Network Scanner
 
 Your friendly neighborhood network scanner. Discover devices on your local network with detailed information including MAC addresses, vendors, open ports, and more.
 
