@@ -44,14 +44,7 @@
   },
   "plugins": {
     "shell": {
-      "open": true,
-      "scope": [
-        {
-          "name": "ping",
-          "cmd": "ping",
-          "args": true
-        }
-      ]
+      "open": true
     }
   }
 }
