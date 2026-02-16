@@ -6,13 +6,12 @@
 	import { ScanProgressPanel } from '$lib/components/scan';
 	import { Input } from '$lib/components/ui/input';
 	import { Button } from '$lib/components/ui/button';
-	import { Select } from '$lib/components/ui/select';
-	import { Wifi, Search, Grid, List, RotateCw, Settings, Plus } from 'lucide-svelte';
+	import { Wifi, Search, Grid, List, Settings, Plus } from 'lucide-svelte';
 
-	// Local state
-	let searchQuery = $state('');
-	let selectedType = $state('all');
-	let selectedStatus = $state('all');
+	// Local state - directly bind to store filters
+	let query = $state(devicesStore.filters.query);
+	let type = $state(devicesStore.filters.type);
+	let status = $state(devicesStore.filters.status);
 	let viewMode = $state(settingsStore.settings.ui.viewMode);
 
 	// Derived from stores
@@ -20,13 +19,10 @@
 	let stats = $derived(devicesStore.stats);
 	let isScanning = $derived(scanStore.isScanning);
 
-	$effect(() => {
-		devicesStore.setFilters({
-			query: searchQuery,
-			type: selectedType as any,
-			status: selectedStatus as any
-		});
-	});
+	// Update store when local state changes (using untrack to prevent loops)
+	function updateFilters() {
+		devicesStore.setFilters({ query, type, status });
+	}
 
 	onMount(() => {
 		devicesStore.load();
@@ -124,19 +120,22 @@
 				<Input
 					placeholder="Search IP, MAC, hostname..."
 					class="pl-9"
-					bind:value={searchQuery}
+					bind:value={query}
+					oninput={updateFilters}
 				/>
 			</div>
 			<select
-				bind:value={selectedType}
+				bind:value={type}
+				onchange={updateFilters}
 				class="h-9 rounded-md border border-input bg-background px-3 text-sm"
 			>
-				{#each deviceTypes as type}
-					<option value={type.value}>{type.label}</option>
+				{#each deviceTypes as t}
+					<option value={t.value}>{t.label}</option>
 				{/each}
 			</select>
 			<select
-				bind:value={selectedStatus}
+				bind:value={status}
+				onchange={updateFilters}
 				class="h-9 rounded-md border border-input bg-background px-3 text-sm"
 			>
 				<option value="all">All Status</option>
