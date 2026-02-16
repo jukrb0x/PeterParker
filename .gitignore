@@ -13,9 +13,12 @@ package
 .pnpm-store
 
 # Tauri
-/src-tauri/target
-/src-tauri/gen
-/src-tauri/Cargo.lock
+target/
+gen/
+Cargo.lock
+
+# Turbo
+.turbo/
 
 # IDE
 .vscode
