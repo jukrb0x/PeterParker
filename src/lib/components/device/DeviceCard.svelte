@@ -27,7 +27,7 @@
 		[DeviceType.Unknown]: HelpCircle
 	};
 
-	const Icon = deviceIcons[device.deviceType] || HelpCircle;
+	const Icon = $derived(deviceIcons[device.deviceType] || HelpCircle);
 </script>
 
 <button
