@@ -1,53 +1,48 @@
-# PeterParker Architecture v2
+# PeterParker Architecture
 
 ## Overview
 
-Three-layer architecture separating concerns for maximum reusability across platforms.
+Two-mode architecture supporting both browser development and desktop deployment.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           Presentation Layer                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────────┐  │
-│  │   Web App    │  │ Tauri App    │  │  Mobile App  │  │  CLI Tool   │  │
-│  │  (Browser)   │  │  (Desktop)   │  │(React Native│  │  (Terminal) │  │
-│  │              │  │              │  │/Swift/etc)  │  │             │  │
-│  │ HTTP/WebSocket│  │ Direct API   │  │ HTTP/WS      │  │  Direct API │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬──────┘  │
-│         │                 │                   │                 │        │
-│         └─────────────────┴───────────────────┴─────────────────┘        │
+│                         ┌─────────────────────┐                          │
+│                         │   SvelteKit Web UI  │                          │
+│                         └─────────────────────┘                          │
 │                                    │                                     │
-│                         ┌──────────┴──────────┐                         │
-│                         │   Shared UI Kit     │                         │
-│                         │  (Svelte Components)│                         │
-│                         └─────────────────────┘                         │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-┌─────────────────────────────────────────────────────────────────────────┐
+│              ┌─────────────────────┴─────────────────────┐               │
+│              │                                           │               │
+│       ┌──────────┐                                 ┌──────────┐          │
+│       │  Browser │                                 │  Tauri   │          │
+│       │  (Mock)  │                                 │  (Real)  │          │
+│       └────┬─────┘                                 └────┬─────┘          │
+│            │                                           │                │
+│            │ HTTP                                      │ IPC            │
+│            │                                           │                │
+├────────────┴───────────────────────────────────────────┴────────────────┤
 │                           Service Layer                                  │
-│  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                  Scanner Service (Rust)                          │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │   │
-│  │  │  HTTP API   │  │ WebSocket   │  │   Core Scanner Engine   │ │   │
-│  │  │  (REST/JSON)│  │ (Realtime)  │  │  - TCP/ICMP/ARP scan    │ │   │
-│  │  └─────────────┘  └─────────────┘  │  - OS fingerprinting    │ │   │
-│  │                                    │  - Service detection    │ │   │
-│  │  ┌─────────────────────────────────┤  - MAC vendor lookup    │ │   │
-│  │  │         Scanner Core Library     │  - HTTP banner grab    │ │   │
-│  │  │    (peterparker-core crate)      └─────────────────────────┘ │   │
-│  │  └─────────────────────────────────────────────────────────────┘   │
-│  └─────────────────────────────────────────────────────────────────┘   │
+│  ┌──────────────────┐                         ┌──────────────────┐      │
+│  │   Mock Scanner   │                         │  Core Scanner    │      │
+│  │   (JavaScript)   │                         │  (Rust/Tauri)    │      │
+│  │                  │                         │                  │      │
+│  │  • Mock devices  │                         │  • ARP scanner   │      │
+│  │  • Simulated     │                         │  • TCP connect   │      │
+│  │    progress      │                         │  • HTTP banner   │      │
+│  │                  │                         │  • 44k vendors   │      │
+│  └──────────────────┘                         └──────────────────┘      │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Key Design Decisions
+## Design Decisions
 
-### 1. Scanner Service is Standalone
-- Runs as separate process (localhost:3030)
-- Can be deployed independently
-- Language-agnostic API (HTTP + WebSocket)
+### 1. Dual Mode Operation
+- **Web Mode**: Mock data for UI development without Tauri
+- **Tauri Mode**: Real network scanning via embedded Rust
 
-### 2. Frontend Adapters
-Each platform implements the same `ScannerClient` interface:
+Both modes share the same UI components and state management.
+
+### 2. Client Abstraction
 
 ```typescript
 interface ScannerClient {
@@ -59,61 +54,41 @@ interface ScannerClient {
 ```
 
 Implementations:
-- `HttpScannerClient` - Web, Mobile, CLI
-- `TauriScannerClient` - Direct Rust call
-- `WsScannerClient` - Real-time updates
+- `TauriScannerClient` - IPC to Rust backend (real scanning)
+- `MockScannerClient` - Simulated data (browser dev)
 
-### 3. Shared UI Components
-Svelte components work everywhere:
-- Web: Direct render
-- Tauri: Direct render
-- Mobile: Svelte Native or WebView
+### 3. Real-time Updates
+
+Tauri mode uses event system for live updates:
+```
+Rust Engine → Tauri Event → Frontend Listener → UI Update
+```
+
+Events:
+- `scan-progress` - Progress bar updates
+- `device-found` - Add device to list immediately
+- `scan-completed` - Scan finished
+- `scan-error` - Error occurred
 
 ### 4. Build Targets
-| Target | Frontend | Backend Connection | Build Command |
-|--------|----------|-------------------|---------------|
-| Web | SvelteKit | HTTP/WebSocket to Scanner Service | `pnpm build:web` |
-| Tauri | SvelteKit | Direct Rust API (embedded) | `pnpm build:tauri` |
-| Mobile | React Native / Swift | HTTP/WebSocket to Scanner Service | Future |
+
+| Target | Frontend | Backend | Command |
+|--------|----------|---------|---------|
+| Web | SvelteKit | Mock | `pnpm dev` |
+| Tauri | SvelteKit | Core Library | `pnpm dev:tauri` |
 
 ## Data Flow
 
-### Web / Mobile
+### Browser Mode (Mock)
 ```
-User Action → UI Component → HttpScannerClient → HTTP → Scanner Service → Core Library → Network
+User Action → UI Component → MockScannerClient → Simulated Data → UI Update
+```
+
+### Tauri Mode (Real)
+```
+User Action → UI Component → TauriScannerClient → IPC → Rust Engine → Network
                      ↑______________________________________________↓
-                              (Response / WebSocket update)
-```
-
-### Tauri
-```
-User Action → UI Component → TauriScannerClient → Rust Command → Core Library → Network
-                     ↑_____________________________________________________↓
-                                    (Direct response)
-```
-
-## API Specification
-
-### HTTP Endpoints
-```
-GET    /api/devices              List all devices
-GET    /api/devices/:ip          Get device by IP
-POST   /api/scan                 Start scan
-GET    /api/scan/:id             Get scan progress/result
-DELETE /api/devices/:id          Delete device
-```
-
-### WebSocket Messages
-```typescript
-// Client → Server
-{ type: "ping" }
-{ type: "subscribe_devices" }
-{ type: "start_scan", config: ScanConfig }
-
-// Server → Client  
-{ type: "pong" }
-{ type: "devices_updated", devices: Device[] }
-{ type: "scan_progress", scanId: string, progress: ScanProgress }
+                              (Tauri Events for real-time updates)
 ```
 
 ## Package Structure
@@ -121,38 +96,64 @@ DELETE /api/devices/:id          Delete device
 ```
 peterparker/
 ├── apps/
-│   ├── scanner/           # Rust HTTP/WebSocket service
-│   ├── web/               # SvelteKit web app (HTTP client)
-│   └── tauri/             # Tauri desktop (Direct Rust)
+│   ├── web/               # SvelteKit frontend
+│   │   └── src/lib/
+│   │       ├── components/    # UI components
+│   │       ├── stores/        # State management
+│   │       └── scanner/       # Client abstraction
+│   └── tauri/             # Tauri desktop wrapper
+│       └── src-tauri/
+│           └── src/
+│               ├── commands/  # IPC handlers
+│               └── lib.rs
 ├── packages/
-│   ├── core/              # Rust core library
-│   └── ui/                # Shared Svelte components (optional)
-└── turbo.json
+│   └── core/              # Rust core library
+│       └── src/
+│           ├── scanner/     # Engine + ARP + TCP + HTTP
+│           ├── fingerprint/ # Vendor + OS detection
+│           └── models/      # Data structures
+└── Cargo.toml             # Rust workspace
 ```
 
 ## Development Workflow
 
 ```bash
-# Terminal 1: Start Scanner Service
-pnpm dev:scanner
+# Web development (mock data)
+pnpm dev
 
-# Terminal 2: Start Web App (connects to scanner)
-pnpm dev:web
-
-# OR: Start Tauri (embedded, no separate scanner needed)
+# Desktop development (real scanning)
 pnpm dev:tauri
+
+# Build for production
+pnpm build:tauri:mac     # macOS Universal
+pnpm build:tauri:win     # Windows
+pnpm build:tauri:linux   # Linux
 ```
 
-## Deployment Options
+## Key Components
 
-### Option 1: Full Stack (Recommended for desktop)
-- Scanner Service + Tauri frontend
-- Everything bundled together
+### Scanner Engine (`packages/core/src/scanner/`)
+- **Engine** (`engine.rs`) - Orchestrates scanning with event emission
+- **ARP** (`arp.rs`) - Cross-platform ARP table parsing
+- **TCP** - TCP connect scanning for ports
+- **HTTP** - Banner grabbing and title extraction
 
-### Option 2: Client-Server (For web/mobile)
-- Scanner Service on server/VPS
-- Web app connects remotely
+### Vendor Database
+44,000+ MAC vendor mappings from Wireshark, embedded at compile time.
 
-### Option 3: Hybrid
-- Scanner Service on local network device (Raspberry Pi)
-- Web/Mobile apps connect to it
+### Frontend State
+- **scanStore** - Manages scan lifecycle, listens to Tauri events
+- **devicesStore** - Device list management
+- **settingsStore** - User preferences
+
+## Deployment
+
+### Desktop (Tauri)
+- Single binary with embedded web assets
+- Real network scanning via native Rust
+- Cross-platform: macOS, Windows, Linux
+
+### Web (Browser)
+- Static build for hosting
+- Mock scanner data only
+- Demo/development purposes

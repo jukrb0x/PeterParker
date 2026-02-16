@@ -38,20 +38,26 @@
 │                   └──────────────┘                           │
 └─────────────────────────────────────────────────────────────┘
                               │
-                              ▼ IPC (Tauri Commands)
-┌─────────────────────────────────────────────────────────────┐
-│                      Backend (Rust)                          │
+              ┌───────────────┴───────────────┐
+              │                               │
+        ┌──────────┐                    ┌──────────┐
+        │   Web    │                    │  Tauri   │
+        │  (Mock)  │                    │  (Real)  │
+        └──────────┘                    └──────────┘
+                                              │
+┌─────────────────────────────────────────────┴─────────────┐
+│                    Backend (Rust/Tauri)                    │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │                  Scanner Engine                      │   │
 │  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌───────────┐  │   │
-│  │  │ ARP     │ │ TCP     │ │ ICMP    │ │ Service   │  │   │
-│  │  │ Scanner │ │ SynScan │ │ Ping    │ │ Discovery │  │   │
+│  │  │ ARP     │ │ TCP     │ │ ICMP    │ │ HTTP      │  │   │
+│  │  │ Scanner │ │ Connect │ │ Ping    │ │ Banner    │  │   │
 │  │  └─────────┘ └─────────┘ └─────────┘ └───────────┘  │   │
 │  └─────────────────────────────────────────────────────┘   │
 │         │                    │                    │         │
 │  ┌──────────────┐   ┌─────────────┐   ┌──────────────────┐ │
-│  │ Device Cache │   │ OS Fingerprint│  │ Protocol Parser  │ │
-│  │ (SQLite/DashMap)│ │ Engine      │   │ (HTTP/SMB/mDNS)  │ │
+│  │ ARP Table    │   │ OS Finger-  │   │ Vendor Database  │ │
+│  │ (System)     │   │ print       │   │ (44,000+ OUIs)   │ │
 │  └──────────────┘   └─────────────┘   └──────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -60,61 +66,27 @@
 
 ```
 peterparker/
-├── src-tauri/
-│   ├── src/
-│   │   ├── main.rs              # Entry point
-│   │   ├── lib.rs               # Library exports
-│   │   ├── commands/            # Tauri IPC handlers
-│   │   │   ├── mod.rs
-│   │   │   ├── scan.rs          # Scan commands
-│   │   │   └── device.rs        # Device CRUD
-│   │   ├── scanner/             # Core scanner engine
-│   │   │   ├── mod.rs
-│   │   │   ├── engine.rs        # Scan orchestrator
-│   │   │   ├── arp.rs           # ARP discovery
-│   │   │   ├── tcp.rs           # TCP SYN scanning
-│   │   │   ├── icmp.rs          # ICMP ping sweeps
-│   │   │   └── service.rs       # Service detection
-│   │   ├── fingerprint/         # Device fingerprinting
-│   │   │   ├── mod.rs
-│   │   │   ├── os.rs            # OS detection
-│   │   │   ├── vendor.rs        # MAC → vendor lookup
-│   │   │   └── http.rs          # HTTP header analysis
-│   │   ├── models/              # Data structures
-│   │   │   ├── mod.rs
-│   │   │   ├── device.rs
-│   │   │   ├── port.rs
-│   │   │   └── scan.rs
-│   │   └── db/                  # Local storage
-│   │       ├── mod.rs
-│   │       └── sqlite.rs
-│   ├── Cargo.toml
-│   └── tauri.conf.json
-├── src/
-│   ├── app.html
-│   ├── app.d.ts
-│   ├── lib/
-│   │   ├── components/          # shadcn-svelte + custom
-│   │   │   ├── ui/              # shadcn base
-│   │   │   ├── device/          # Device card, detail
-│   │   │   ├── scan/            # Progress, controls
-│   │   │   └── layout/          # Nav, sidebar
-│   │   ├── stores/              # Svelte 5 runes
-│   │   │   ├── devices.svelte.ts
-│   │   │   ├── scan.svelte.ts
-│   │   │   └── settings.svelte.ts
-│   │   ├── scanner/             # Frontend scanner API
-│   │   │   ├── client.ts        # Tauri invoke wrapper
-│   │   │   └── types.ts         # Shared types
-│   │   └── utils/
-│   ├── routes/
-│   │   ├── +layout.svelte
-│   │   ├── +page.svelte         # Dashboard
-│   │   └── device/[ip]/+page.svelte
-│   └── styles/
-├── tests/                       # vitest tests
-├── docs/
-└── package.json
+├── apps/
+│   ├── web/           # SvelteKit frontend (@peterparker/web)
+│   └── tauri/         # Tauri desktop app
+│       └── src-tauri/
+│           ├── src/
+│           │   ├── commands/      # Tauri IPC handlers
+│           │   ├── lib.rs         # App setup
+│           │   └── main.rs        # Entry point
+│           └── Cargo.toml
+├── packages/
+│   └── core/          # Rust core library (peterparker-core)
+│       ├── src/
+│       │   ├── scanner/       # Engine, ARP, TCP, HTTP
+│       │   ├── fingerprint/   # Vendor, OS detection
+│       │   └── models/        # Device, Port, Scan types
+│       └── data/
+│           └── manuf.txt      # Wireshark vendor DB
+├── Cargo.toml         # Rust workspace
+├── package.json       # npm scripts
+├── turbo.json         # Turbo config
+└── pnpm-workspace.yaml
 ```
 
 ---
@@ -124,23 +96,21 @@ peterparker/
 ### 3.1 Core Types (Rust/TS shared)
 
 ```typescript
-// Device - central entity
 interface Device {
-  id: string;                    // ULID
-  ip: string;                    // IPv4/v6
+  id: string;                    // UUID
+  ip: string;                    // IPv4
   mac: string | null;            // MAC address
   vendor: string | null;         // MAC vendor lookup
   hostname: string | null;       // DNS/mDNS hostname
   os: OperatingSystem | null;    // Detected OS
   deviceType: DeviceType;        // Classified type
-  firstSeen: Date;
-  lastSeen: Date;
+  firstSeen: string;             // ISO date
+  lastSeen: string;              // ISO date
   isOnline: boolean;
   ports: Port[];
   metadata: DeviceMetadata;
 }
 
-// Port scan result
 interface Port {
   number: number;
   protocol: 'tcp' | 'udp';
@@ -149,48 +119,31 @@ interface Port {
   banner: string | null;
 }
 
-// Service fingerprint
 interface Service {
-  name: string;                  // ssh, http, etc
+  name: string;
   version: string | null;
   product: string | null;
   extraInfo: Record<string, unknown>;
 }
 
-// OS detection
 interface OperatingSystem {
   name: string;
   family: 'windows' | 'linux' | 'macos' | 'bsd' | 'embedded' | 'unknown';
   version: string | null;
-  confidence: number;            // 0-100
+  confidence: number;
   cpe: string[];
 }
 
-// Device classification
-enum DeviceType {
-  Router = 'router',
-  Switch = 'switch',
-  Desktop = 'desktop',
-  Laptop = 'laptop',
-  Mobile = 'mobile',
-  Iot = 'iot',
-  Printer = 'printer',
-  Nas = 'nas',
-  Unknown = 'unknown'
-}
-
-// Scan configuration
 interface ScanConfig {
   targetRange: string;           // CIDR notation
   ports: 'top100' | 'top1000' | number[] | 'all';
   scanType: 'arp' | 'ping' | 'syn' | 'connect' | 'comprehensive';
-  timeout: number;               // ms per host
-  concurrency: number;           // parallel hosts
+  timeout: number;
+  concurrency: number;
   enableOsDetection: boolean;
   enableServiceDetection: boolean;
 }
 
-// Scan progress
 interface ScanProgress {
   scanId: string;
   status: 'pending' | 'running' | 'paused' | 'completed' | 'error';
@@ -230,85 +183,7 @@ interface ScanProgress {
 **Spacing Scale**: 4px base
 - xs: 4px, sm: 8px, md: 16px, lg: 24px, xl: 32px, 2xl: 48px
 
-### 4.2 Key Screens
-
-#### Dashboard (`/`)
-```
-┌─────────────────────────────────────────────────────────┐
-│  PeterParker                              [Scan ▼] [⚙️] │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌─────────────────┐  ┌─────────────────┐              │
-│  │   12 Devices    │  │   3 New Today   │              │
-│  │   8 Online      │  │   2 Offline     │              │
-│  └─────────────────┘  └─────────────────┘              │
-│                                                         │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │ Network Graph (D3/Force)                         │   │
-│  │ • Nodes = devices                                │   │
-│  │ • Edges = traffic paths (simulated)              │   │
-│  │ • Color = device type                            │   │
-│  └─────────────────────────────────────────────────┘   │
-│                                                         │
-│  Recent Activity                                        │
-│  ─────────────────                                      │
-│  • 192.168.1.105  joined  [2 min ago]                  │
-│  • 192.168.1.109  left    [5 min ago]                  │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-#### Device List
-```
-┌─────────────────────────────────────────────────────────┐
-│  [🔍 Filter...]  [Router ▼]  [Online ▼]  [Grid/List]   │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │ 🌐  192.168.1.1          TP-LINK Router         │   │
-│  │     00:1A:2B:3C:4D:5E    ● Online 2d            │   │
-│  └─────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │ 🖥️  192.168.1.101        John's MacBook Pro    │   │
-│  │     00:1A:2B:3C:4D:5F    ● Online 5min          │   │
-│  └─────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │ 📱  192.168.1.106        iPhone 15             │   │
-│  │     00:1A:2B:3C:4D:60    ○ Offline 2h           │   │
-│  └─────────────────────────────────────────────────┘   │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-#### Device Detail
-```
-┌─────────────────────────────────────────────────────────┐
-│  ← Back                        [Export] [Edit] [🗑️]     │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  🌐  TP-LINK Router                                     │
-│      192.168.1.1                              ● Online  │
-│      00:1A:2B:3C:4D:5E                                  │
-│                                                         │
-│  ┌───────────────┐ ┌───────────────┐ ┌───────────────┐ │
-│  │ OS: Linux     │ │ Type: Router  │ │ First: 2w ago │ │
-│  └───────────────┘ └───────────────┘ └───────────────┘ │
-│                                                         │
-│  Open Ports                                  [Rescan]   │
-│  ─────────────────────────────────────────────────────  │
-│  Port  │ Service    │ Version       │ Banner            │
-│  80/tcp  http         nginx/1.20      Server: nginx    │
-│  53/udp  dns          dnsmasq 2.86                      │
-│  22/tcp  ssh          OpenSSH 8.9    SSH-2.0-OpenSSH   │
-│                                                         │
-│  Timeline                                               │
-│  ─────────────────────────────────────────────────────  │
-│  [Timeline: uptime/offline events over time]            │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-### 4.3 Component Inventory
+### 4.2 Component Inventory
 
 **shadcn-svelte Base**:
 - Button, Card, Dialog, DropdownMenu, Input, Label, Progress, Select, Separator, Sheet, Skeleton, Switch, Table, Tabs, Tooltip
@@ -316,11 +191,8 @@ interface ScanProgress {
 **Custom Components**:
 - `DeviceCard` - Summary card with icon, IP, status
 - `DeviceIcon` - Dynamic icon based on device type
-- `PortTable` - Sortable port/service table
-- `NetworkGraph` - D3 force-directed graph
-- `ScanProgress` - Animated progress with ETA
+- `ScanProgressPanel` - Animated progress with ETA
 - `StatusBadge` - Online/offline indicator
-- `MacLookup` - Vendor lookup display
 
 ---
 
@@ -332,40 +204,33 @@ interface ScanProgress {
 |--------|-------|----------|----------|
 | **ARP** | <1s | MAC only | Same subnet, fast discovery |
 | **ICMP Ping** | ~2s | Reachability | Cross-subnet, router-aware |
-| **TCP SYN** | ~5s | Port state | Stealth, no full handshake |
-| **TCP Connect** | ~10s | Full service | Most compatible |
-| **Comprehensive** | ~60s | Maximum | Full fingerprint |
+| **TCP Connect** | ~5s | Port state | Most compatible |
+| **Comprehensive** | ~30s | Maximum | Full fingerprint |
 
-### 5.2 Rust Scanner Architecture
+### 5.2 Key Features
+
+1. **ARP Scanning**: Cross-platform ARP table parsing (macOS/Linux/Windows)
+2. **TCP Connect**: Port scanning with connection timeouts
+3. **MAC Vendor Lookup**: 44,000+ vendor mappings from Wireshark
+4. **HTTP Banner Grabbing**: Extract title and server headers
+5. **Real-time Events**: Progress updates via Tauri event system
+
+### 5.3 Event System
 
 ```rust
-// Core traits for scanner modules
-pub trait Scanner: Send + Sync {
-    fn name(&self) -> &'static str;
-    fn scan(&self, target: &Target) -> impl Future<Output = Result<ScanResult>>;
-}
-
-// Engine orchestrates multiple scanners
-pub struct ScannerEngine {
-    scanners: Vec<Box<dyn Scanner>>,
-    concurrency: usize,
-    timeout: Duration,
-}
-
-impl ScannerEngine {
-    pub async fn scan_range(&self, range: IpRange) -> mpsc::Receiver<Device> {
-        // Parallel execution with backpressure
-    }
+pub enum ScanEvent {
+    Progress { scanned, total, found, current },
+    DeviceFound(Device),
+    Completed,
+    Error(String),
 }
 ```
 
-### 5.3 Key Features
-
-1. **ARP Scanning**: Raw socket manipulation, cache snooping
-2. **TCP SYN**: Custom socket options for stealth
-3. **Service Detection**: Banner grabbing + probe matching
-4. **OS Fingerprinting**: TCP/IP stack quirks analysis
-5. **mDNS/LLMNR**: Hostname resolution beyond DNS
+Frontend listens via Tauri events:
+- `scan-progress`
+- `device-found`
+- `scan-completed`
+- `scan-error`
 
 ---
 
@@ -374,40 +239,14 @@ impl ScannerEngine {
 ### 6.1 Frontend (vitest)
 
 ```typescript
-// tests/components/DeviceCard.test.ts
+// Component tests
 import { render, screen } from '@testing-library/svelte';
 import DeviceCard from '$lib/components/device/DeviceCard.svelte';
 
 describe('DeviceCard', () => {
-  const mockDevice = {
-    ip: '192.168.1.1',
-    mac: '00:11:22:33:44:55',
-    vendor: 'Apple',
-    isOnline: true,
-    deviceType: DeviceType.Router
-  };
-
   it('renders device IP', () => {
     render(DeviceCard, { props: { device: mockDevice } });
     expect(screen.getByText('192.168.1.1')).toBeInTheDocument();
-  });
-
-  it('shows online status', () => {
-    render(DeviceCard, { props: { device: mockDevice } });
-    expect(screen.getByTestId('status-online')).toBeVisible();
-  });
-});
-
-// tests/stores/devices.test.ts
-import { describe, it, expect } from 'vitest';
-import { createDevicesStore } from '$lib/stores/devices.svelte';
-
-describe('devices store', () => {
-  it('adds device to store', () => {
-    const store = createDevicesStore();
-    const device = { id: '1', ip: '192.168.1.1' };
-    store.add(device);
-    expect(store.getAll()).toHaveLength(1);
   });
 });
 ```
@@ -415,141 +254,54 @@ describe('devices store', () => {
 ### 6.2 Backend (cargo test)
 
 ```rust
-// src/scanner/arp.rs
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_arp_scan_localhost() {
-        let scanner = ArpScanner::new();
-        let target = Target::new("127.0.0.1").unwrap();
-        let result = scanner.scan(&target).await;
-        assert!(result.is_ok());
-    }
+#[tokio::test]
+async fn test_arp_table_parsing() {
+    let table = arp::get_arp_table().await.unwrap();
+    assert!(!table.is_empty());
 }
 
-// Integration tests
-// tests/scanner_integration.rs
-#[tokio::test]
-async fn test_end_to_end_scan() {
-    let engine = ScannerEngine::builder()
-        .add_scanner(ArpScanner::new())
-        .add_scanner(IcmpScanner::new())
-        .concurrency(10)
-        .build();
-    
-    let range = IpRange::parse("192.168.1.0/24").unwrap();
-    let devices: Vec<_> = engine.scan_range(range).collect().await;
-    
-    assert!(!devices.is_empty());
+#[test]
+fn test_vendor_lookup() {
+    let vendor = lookup_vendor("001B63"); // Apple
+    assert!(vendor.is_some());
 }
 ```
 
 ---
 
-## 7. Milestones
+## 7. Commands
 
-### Phase 1: Foundation (Week 1)
-- [ ] Project scaffold (Tauri + SvelteKit + shadcn)
-- [ ] Git setup, CI/CD skeleton
-- [ ] Core Rust models + types
-- [ ] Basic ARP scanner
+```bash
+# Setup
+pnpm install
 
-### Phase 2: Core Features (Week 2)
-- [ ] TCP SYN scanner
-- [ ] ICMP ping sweeps
-- [ ] Device list UI
-- [ ] Real-time scan progress
+# Development
+pnpm dev              # Web with mock data
+pnpm dev:tauri        # Desktop with real scanning
 
-### Phase 3: Intelligence (Week 3)
-- [ ] MAC vendor lookup
-- [ ] OS fingerprinting
-- [ ] Service detection
-- [ ] Device detail view
+# Building
+pnpm build:web        # Build web frontend
+pnpm build:tauri:mac  # Build macOS app
+pnpm build:tauri:win  # Build Windows app
+pnpm build:tauri:linux # Build Linux app
 
-### Phase 4: Polish (Week 4)
-- [ ] Network graph visualization
-- [ ] Export (JSON/CSV)
-- [ ] Settings persistence
-- [ ] Tests + documentation
+# Testing
+pnpm test             # All tests
+pnpm test:core        # Rust tests
+pnpm test:web         # Web tests
+
+# Maintenance
+pnpm check            # Type check all
+pnpm lint             # Lint all
+pnpm format           # Format all
+pnpm clean            # Clean builds
+```
 
 ---
 
 ## 8. Security Considerations
 
-1. **Raw sockets**: Requires elevated privileges on some platforms
-2. **Network traffic**: Scanner generates noticeable traffic
-3. **Data storage**: Device cache stored locally, encrypted at rest
-4. **Permissions**: Explicit user consent for network access
-
----
-
-## 9. File Structure
-
-```
-peterparker/
-├── AGENTS.md                    # This file
-├── DESIGN.md                    # Design specification
-├── README.md                    # User documentation
-├── LICENSE                      # MIT
-├── .gitignore
-├── package.json                 # Node dependencies
-├── svelte.config.js
-├── vite.config.ts
-├── tailwind.config.ts
-├── tsconfig.json
-├── components.json              # shadcn-svelte config
-├── src/
-│   ├── app.html
-│   ├── app.d.ts
-│   ├── lib/
-│   │   ├── components/
-│   │   │   ├── ui/              # shadcn components
-│   │   │   ├── device/
-│   │   │   ├── scan/
-│   │   │   └── layout/
-│   │   ├── stores/
-│   │   ├── scanner/
-│   │   └── utils/
-│   ├── routes/
-│   └── styles/
-├── src-tauri/
-│   ├── Cargo.toml
-│   ├── build.rs
-│   ├── tauri.conf.json
-│   ├── capabilities/
-│   ├── icons/
-│   └── src/
-│       ├── main.rs
-│       ├── lib.rs
-│       ├── commands/
-│       ├── scanner/
-│       ├── fingerprint/
-│       ├── models/
-│       └── db/
-├── tests/                       # vitest tests
-└── docs/                        # Additional docs
-```
-
----
-
-## 10. Commands
-
-```bash
-# Setup
-cd peterparker
-npm install
-cd src-tauri && cargo build
-
-# Dev
-npm run tauri dev           # Start dev server
-
-# Test
-npm run test               # vitest
-npm run test:ui            # vitest UI
-cd src-tauri && cargo test # Rust tests
-
-# Build
-npm run tauri build        # Production build
-```
+1. **Raw sockets**: Uses system commands (ping, arp) - no root required on most platforms
+2. **Network traffic**: Scanner generates ICMP and TCP traffic on local network
+3. **Data storage**: Device cache in memory only (SQLite persistence TODO)
+4. **Permissions**: User consent required for network access

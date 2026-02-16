@@ -1,63 +1,114 @@
 # Monorepo Structure
 
-PeterParker is organized as a pnpm workspace monorepo with Turbo.
+PeterParker is organized as a pnpm workspace with Rust workspace integration.
 
 ## Structure
 
 ```
 peterparker/
 ├── apps/
-│   ├── web/              # SvelteKit frontend
+│   ├── web/              # SvelteKit frontend (@peterparker/web)
 │   └── tauri/            # Tauri desktop app
 ├── packages/
-│   └── core/             # Rust core library
+│   └── core/             # Rust core library (peterparker-core)
+├── Cargo.toml            # Rust workspace
 ├── turbo.json            # Turbo pipeline config
 ├── pnpm-workspace.yaml   # pnpm workspace config
-└── package.json          # Root package.json
+└── package.json          # Root npm scripts
 ```
 
 ## Apps
 
 ### @peterparker/web
 Location: `apps/web/`
-- SvelteKit frontend
-- TypeScript + Svelte 5
+- SvelteKit frontend with Svelte 5
+- TypeScript + Tailwind CSS
 - shadcn-svelte UI components
 - Vitest tests
+- Can run standalone with mock scanner data
 
-### @peterparker/tauri
+### Tauri
 Location: `apps/tauri/`
 - Tauri v2 desktop app
-- Depends on `peterparker-core`
-- Shell plugin for ping commands
+- Embeds `peterparker-core` for real scanning
+- Real-time events via Tauri IPC
 
 ## Packages
 
 ### peterparker-core
 Location: `packages/core/`
-- Rust library
-- Network scanning logic
+- Rust library with network scanning logic
+- Scanner engine with ARP/TCP/HTTP modules
+- Vendor lookup (44,000+ MAC OUIs)
 - Device fingerprinting
-- Models and types
 
 ## Commands
 
+### Development
 ```bash
-# Install dependencies
-pnpm install
+# Web only (mock data)
+pnpm dev
+pnpm dev:web
 
-# Run web dev
-pnpm --filter @peterparker/web dev
+# Desktop (real scanning)
+pnpm dev:tauri
+```
 
-# Run Tauri dev
-pnpm tauri:dev
+### Building
+```bash
+# Web
+pnpm build:web
 
-# Build all
-pnpm build
+# Desktop (all platforms)
+pnpm build:tauri
 
-# Test all
+# Platform-specific
+pnpm build:tauri:mac     # macOS Universal
+pnpm build:tauri:win     # Windows x64
+pnpm build:tauri:linux   # Linux x64
+```
+
+### Testing
+```bash
+# All tests
 pnpm test
 
-# Test specific package
-pnpm --filter @peterparker/web test:run
+# Specific packages
+pnpm test:core        # Rust tests only
+pnpm test:web         # Web tests only
 ```
+
+### Maintenance
+```bash
+pnpm check            # Type check all
+pnpm lint             # Lint all
+pnpm format           # Format all
+pnpm clean            # Clean all builds
+```
+
+## Workspaces
+
+### pnpm Workspace
+Managed by `pnpm-workspace.yaml`:
+```yaml
+packages:
+  - 'apps/*'
+  - 'packages/*'
+```
+
+### Rust Workspace
+Managed by root `Cargo.toml`:
+```toml
+[workspace]
+members = [
+    "packages/core",
+    "apps/tauri/src-tauri",
+]
+```
+
+## Development Modes
+
+1. **Web Mode** (`pnpm dev`): Browser with mock scanner data
+2. **Tauri Mode** (`pnpm dev:tauri`): Desktop with real network scanning
+
+Both share the same UI components and state management.
