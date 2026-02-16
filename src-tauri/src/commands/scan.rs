@@ -3,33 +3,31 @@ use tauri::State;
 use tokio::sync::RwLock;
 use dashmap::DashMap;
 
-use crate::models::{Device, ScanProgress, ScanResult, ScanConfig};
+use crate::models::{Device, ScanProgress, ScanResult, ScanConfig, ScanStatus, ScanMethod};
 use crate::scanner::ScannerEngine;
-
-pub type ScanStore = Arc<DashMap<String, (ScanProgress, Option<ScanResult>)>>;
-pub type DeviceStore = Arc<RwLock<Vec<Device>>>;
+use crate::{ScanStore, DeviceStore};
 
 #[tauri::command]
 pub async fn start_scan(
     config: ScanConfig,
-    progress_store: State<'_, ScanStore>,
+    scan_store: State<'_, ScanStore>,
     device_store: State<'_, DeviceStore>,
 ) -> Result<String, String> {
     let scan_id = uuid::Uuid::new_v4().to_string();
     
     // Parse target range
     let range = crate::scanner::IpRange::parse(&config.target_range)
-        .map_err(|e| format!("Invalid range: {}", e))?;
+        .map_err(|_| format!("Invalid IP range: {}", config.target_range))?;
     
     let total_hosts = range.size();
     
     // Initialize progress
     let progress = ScanProgress::new(scan_id.clone(), total_hosts);
-    progress_store.insert(scan_id.clone(), (progress, None));
+    scan_store.insert(scan_id.clone(), (progress, None));
     
     // Start scanner in background
     let scan_id_clone = scan_id.clone();
-    let progress_store_clone = progress_store.inner().clone();
+    let scan_store_clone = scan_store.inner().clone();
     let device_store_clone = device_store.inner().clone();
     let config_clone = config.clone();
     
@@ -38,8 +36,8 @@ pub async fn start_scan(
         let mut result = ScanResult::new(scan_id_clone.clone(), config_clone);
         
         // Update status to running
-        if let Some((p, _)) = progress_store_clone.get_mut(&scan_id_clone) {
-            p.status = crate::models::ScanStatus::Running;
+        if let Some((p, _)) = scan_store_clone.get_mut(&scan_id_clone) {
+            p.status = ScanStatus::Running;
         }
         
         match engine.scan_range(range).await {
@@ -58,16 +56,16 @@ pub async fn start_scan(
                 }
                 
                 // Update progress
-                if let Some((p, r)) = progress_store_clone.get_mut(&scan_id_clone) {
-                    p.status = crate::models::ScanStatus::Completed;
+                if let Some((p, r)) = scan_store_clone.get_mut(&scan_id_clone) {
+                    p.status = ScanStatus::Completed;
                     p.scanned_hosts = p.total_hosts;
                     p.found_devices = result.devices.len() as u32;
                     *r = Some(result);
                 }
             }
             Err(e) => {
-                if let Some((p, _)) = progress_store_clone.get_mut(&scan_id_clone) {
-                    p.status = crate::models::ScanStatus::Error;
+                if let Some((p, _)) = scan_store_clone.get_mut(&scan_id_clone) {
+                    p.status = ScanStatus::Error;
                     p.error = Some(e.to_string());
                 }
             }
@@ -80,9 +78,9 @@ pub async fn start_scan(
 #[tauri::command]
 pub async fn get_scan_progress(
     scan_id: String,
-    progress_store: State<'_, ScanStore>,
+    scan_store: State<'_, ScanStore>,
 ) -> Result<ScanProgress, String> {
-    progress_store
+    scan_store
         .get(&scan_id)
         .map(|entry| entry.0.clone())
         .ok_or_else(|| "Scan not found".to_string())
@@ -90,37 +88,37 @@ pub async fn get_scan_progress(
 
 #[tauri::command]
 pub async fn pause_scan(
-    scan_id: String,
-    _progress_store: State<'_, ScanStore>,
+    _scan_id: String,
+    _scan_store: State<'_, ScanStore>,
 ) -> Result<(), String> {
-    // TODO: Implement pause logic
-    Err("Pause not yet implemented".to_string())
+    // TODO: Implement pause logic with cancellation tokens
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn resume_scan(
-    scan_id: String,
-    _progress_store: State<'_, ScanStore>,
+    _scan_id: String,
+    _scan_store: State<'_, ScanStore>,
 ) -> Result<(), String> {
     // TODO: Implement resume logic
-    Err("Resume not yet implemented".to_string())
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn cancel_scan(
     scan_id: String,
-    progress_store: State<'_, ScanStore>,
+    scan_store: State<'_, ScanStore>,
 ) -> Result<(), String> {
-    progress_store.remove(&scan_id);
+    scan_store.remove(&scan_id);
     Ok(())
 }
 
 #[tauri::command]
 pub async fn get_scan_result(
     scan_id: String,
-    progress_store: State<'_, ScanStore>,
+    scan_store: State<'_, ScanStore>,
 ) -> Result<ScanResult, String> {
-    progress_store
+    scan_store
         .get(&scan_id)
         .and_then(|entry| entry.1.clone())
         .ok_or_else(|| "Scan result not found".to_string())

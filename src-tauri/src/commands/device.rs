@@ -2,8 +2,8 @@ use tauri::State;
 use tokio::sync::RwLock;
 use std::sync::Arc;
 
-use crate::models::Device;
-use super::scan::DeviceStore;
+use crate::models::{Device, Port, port::PortState};
+use crate::{DeviceStore};
 
 #[tauri::command]
 pub async fn get_devices(
@@ -41,7 +41,7 @@ pub async fn rescan_device(
     let mut device = Device::new(ip.clone());
     
     // TCP scan for common ports
-    let ports = crate::scanner::quick_scan_ports(&ip, &crate::models::port::TOP_PORTS[..20]).await;
+    let ports = quick_scan_ports(&ip, &crate::models::port::TOP_PORTS[..20]).await;
     device.ports = ports;
     device.classify();
     
@@ -62,4 +62,37 @@ pub async fn export_devices(
 ) -> Result<String, String> {
     let store = device_store.read().await;
     serde_json::to_string_pretty(&*store).map_err(|e| e.to_string())
+}
+
+async fn quick_scan_ports(ip: &str, ports: &[u16]) -> Vec<Port> {
+    use std::time::Duration;
+    use std::net::{TcpStream, ToSocketAddrs};
+    
+    let mut open_ports = Vec::new();
+    let timeout = Duration::from_millis(1000);
+    
+    for port in ports {
+        let addr = format!("{}:{}", ip, port);
+        
+        match tokio::time::timeout(
+            timeout,
+            tokio::task::spawn_blocking({
+                let addr = addr.clone();
+                let timeout = timeout;
+                move || {
+                    TcpStream::connect_timeout(
+                        &addr.to_socket_addrs()?.next().unwrap(),
+                        timeout,
+                    ).ok()
+                }
+            })
+        ).await {
+            Ok(Ok(Some(_))) => {
+                open_ports.push(Port::open_tcp(*port));
+            }
+            _ => continue,
+        }
+    }
+    
+    open_ports
 }
