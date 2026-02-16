@@ -1,8 +1,7 @@
 <script lang="ts">
-	import type { Device } from '$lib/stores';
-	import { DeviceType } from '$lib/scanner/types';
+	import type { Device } from '$lib/scanner/types';
 	import { formatDate } from '$lib/utils';
-	import { Laptop, Smartphone, Router, Printer, HardDrive, Tv, Gamepad2, HelpCircle, Wifi } from 'lucide-svelte';
+	import { Laptop, Smartphone, Router, Printer, HardDrive, Tv, Gamepad2, HelpCircle, Wifi, Camera, Server, Monitor } from 'lucide-svelte';
 
 	interface Props {
 		device: Device;
@@ -11,23 +10,26 @@
 
 	let { device, onClick }: Props = $props();
 
-	const deviceIcons: Record<DeviceType, typeof Laptop> = {
-		[DeviceType.Desktop]: Laptop,
-		[DeviceType.Laptop]: Laptop,
-		[DeviceType.Mobile]: Smartphone,
-		[DeviceType.Tablet]: Smartphone,
-		[DeviceType.Router]: Router,
-		[DeviceType.Switch]: Router,
-		[DeviceType.Printer]: Printer,
-		[DeviceType.Nas]: HardDrive,
-		[DeviceType.Tv]: Tv,
-		[DeviceType.GameConsole]: Gamepad2,
-		[DeviceType.Iot]: Wifi,
-		[DeviceType.Camera]: Wifi,
-		[DeviceType.Unknown]: HelpCircle
+	// Map device type strings to icons
+	const deviceIconMap: Record<string, typeof Laptop> = {
+		desktop: Monitor,
+		laptop: Laptop,
+		mobile: Smartphone,
+		tablet: Smartphone,
+		router: Router,
+		switch: Router,
+		printer: Printer,
+		nas: HardDrive,
+		tv: Tv,
+		game_console: Gamepad2,
+		gameconsole: Gamepad2,
+		iot: Wifi,
+		camera: Camera,
+		server: Server,
+		unknown: HelpCircle
 	};
 
-	const Icon = $derived(deviceIcons[device.deviceType] || HelpCircle);
+	const Icon = $derived(deviceIconMap[device.deviceType] || HelpCircle);
 </script>
 
 <button
@@ -60,7 +62,7 @@
 			{/if}
 
 			<div class="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-				<span class="capitalize">{device.deviceType}</span>
+				<span class="capitalize">{device.deviceType.replace('_', ' ')}</span>
 				<span>•</span>
 				<span>{formatDate(new Date(device.lastSeen))}</span>
 				{#if device.ports.length > 0}

@@ -24,6 +24,13 @@
 		--input: 0 0% 15%;
 		--ring: 217 91% 60%;
 		--radius: 0.5rem;
+		/* PeterParker custom colors */
+		--pp-bg: 0 0% 4%;
+		--pp-surface: 0 0% 8%;
+		--pp-surface-highlight: 0 0% 12%;
+		--pp-success: 142 76% 36%;
+		--pp-offline: 0 0% 40%;
+		--pp-online: 142 76% 50%;
 	}
 }
 

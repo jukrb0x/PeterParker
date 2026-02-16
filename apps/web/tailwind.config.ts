@@ -40,7 +40,14 @@ const config: Config = {
 				},
 				border: 'hsl(var(--border) / <alpha-value>)',
 				input: 'hsl(var(--input) / <alpha-value>)',
-				ring: 'hsl(var(--ring) / <alpha-value>)'
+				ring: 'hsl(var(--ring) / <alpha-value>)',
+				// PeterParker custom colors
+				'pp-bg': 'hsl(var(--pp-bg) / <alpha-value>)',
+				'pp-surface': 'hsl(var(--pp-surface) / <alpha-value>)',
+				'pp-surface-highlight': 'hsl(var(--pp-surface-highlight) / <alpha-value>)',
+				'pp-success': 'hsl(var(--pp-success) / <alpha-value>)',
+				'pp-offline': 'hsl(var(--pp-offline) / <alpha-value>)',
+				'pp-online': 'hsl(var(--pp-online) / <alpha-value>)'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
