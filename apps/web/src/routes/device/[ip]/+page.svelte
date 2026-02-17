@@ -6,7 +6,7 @@
 	import { ArrowLeft, Download, Trash2, RotateCw } from 'lucide-svelte';
 	import { formatDate } from '$lib/utils';
 
-	let ip = $derived($page.params.ip);
+	let ip = $derived($page.params.ip ?? '');
 	let device = $derived(devicesStore.getByIp(ip));
 
 	function goBack() {

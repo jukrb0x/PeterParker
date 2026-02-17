@@ -3,12 +3,13 @@
  * Persistent user preferences
  */
 
-import type { ScanConfig, ScanMethod } from '$lib/scanner/types';
+import type { ScanConfig } from '$lib/scanner/types';
+import { ScanMethod } from '$lib/scanner/types';
 
 interface AppSettings {
 	scanDefaults: ScanConfig;
 	ui: {
-		viewMode: 'grid' | 'list';
+		viewMode: 'grid' | 'list' | 'topology';
 		showOffline: boolean;
 		refreshInterval: number; // seconds, 0 = off
 	};
@@ -18,7 +19,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 	scanDefaults: {
 		targetRange: '192.168.1.0/24',
 		ports: 'top100',
-		scanType: 'comprehensive' as ScanMethod,
+		scanType: ScanMethod.Comprehensive,
 		timeout: 2000,
 		concurrency: 50,
 		enableOsDetection: true,

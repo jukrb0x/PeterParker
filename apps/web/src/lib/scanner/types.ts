@@ -118,7 +118,7 @@ export interface ScanResult {
 }
 
 // UI-specific types
-export type ViewMode = 'grid' | 'list';
+export type ViewMode = 'grid' | 'list' | 'topology';
 
 export interface FilterState {
 	query: string;

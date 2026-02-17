@@ -21,7 +21,7 @@ describe('DeviceCard', () => {
 		lastSeen: new Date().toISOString(),
 		isOnline: true,
 		ports: [],
-		metadata: {}
+		metadata: { httpTitle: null, httpServer: null, sshVersion: null, smbInfo: null, ttl: null, windowSize: null }
 	};
 
 	it('renders device IP', () => {

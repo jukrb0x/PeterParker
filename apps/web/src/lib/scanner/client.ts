@@ -1,5 +1,6 @@
 import { browser } from '$app/environment';
 import type { Device, ScanConfig, ScanProgress, ScanResult } from './types';
+import { DeviceType, PortState, ScanStatus, ScanMethod } from './types';
 
 /**
  * Detect if running in Tauri environment
@@ -20,13 +21,13 @@ const mockDevices: Device[] = [
 		vendor: 'TP-Link',
 		hostname: 'router.local',
 		os: null,
-		deviceType: 'router',
+		deviceType: DeviceType.Router,
 		firstSeen: new Date().toISOString(),
 		lastSeen: new Date().toISOString(),
 		isOnline: true,
 		ports: [
-			{ number: 80, protocol: 'tcp', state: 'open', service: { name: 'http', version: null, product: null, extraInfo: {} }, banner: null },
-			{ number: 443, protocol: 'tcp', state: 'open', service: { name: 'https', version: null, product: null, extraInfo: {} }, banner: null }
+			{ number: 80, protocol: 'tcp', state: PortState.Open, service: { name: 'http', version: null, product: null, extraInfo: {} }, banner: null },
+			{ number: 443, protocol: 'tcp', state: PortState.Open, service: { name: 'https', version: null, product: null, extraInfo: {} }, banner: null }
 		],
 		metadata: { httpTitle: 'TP-Link Router', httpServer: 'nginx', sshVersion: null, smbInfo: null, ttl: 64, windowSize: null }
 	},
@@ -37,12 +38,12 @@ const mockDevices: Device[] = [
 		vendor: 'Apple',
 		hostname: 'MacBook-Pro.local',
 		os: { name: 'macOS', family: 'macos', version: '14.0', confidence: 90, cpe: [] },
-		deviceType: 'laptop',
+		deviceType: DeviceType.Laptop,
 		firstSeen: new Date().toISOString(),
 		lastSeen: new Date().toISOString(),
 		isOnline: true,
 		ports: [
-			{ number: 22, protocol: 'tcp', state: 'open', service: { name: 'ssh', version: '9.0', product: 'OpenSSH', extraInfo: {} }, banner: null }
+			{ number: 22, protocol: 'tcp', state: PortState.Open, service: { name: 'ssh', version: '9.0', product: 'OpenSSH', extraInfo: {} }, banner: null }
 		],
 		metadata: { httpTitle: null, httpServer: null, sshVersion: 'OpenSSH_9.0', smbInfo: null, ttl: 64, windowSize: null }
 	},
@@ -53,7 +54,7 @@ const mockDevices: Device[] = [
 		vendor: 'Xiaomi',
 		hostname: null,
 		os: null,
-		deviceType: 'mobile',
+		deviceType: DeviceType.Mobile,
 		firstSeen: new Date().toISOString(),
 		lastSeen: new Date().toISOString(),
 		isOnline: true,
@@ -67,7 +68,7 @@ const mockDevices: Device[] = [
 		vendor: null,
 		hostname: null,
 		os: null,
-		deviceType: 'unknown',
+		deviceType: DeviceType.Unknown,
 		firstSeen: new Date(Date.now() - 86400000).toISOString(),
 		lastSeen: new Date(Date.now() - 3600000).toISOString(),
 		isOnline: false,
@@ -201,7 +202,7 @@ class MockScannerClient {
 		mockScanId = `mock-scan-${Date.now()}`;
 		mockScanProgress = {
 			scanId: mockScanId,
-			status: 'running',
+			status: ScanStatus.Running,
 			totalHosts: 254,
 			scannedHosts: 0,
 			foundDevices: 0,
@@ -218,7 +219,7 @@ class MockScannerClient {
 		}
 
 		// Simulate progress
-		if (mockScanProgress.status === 'running') {
+		if (mockScanProgress.status === ScanStatus.Running) {
 			mockScanProgress.scannedHosts = Math.min(
 				mockScanProgress.scannedHosts + 10,
 				mockScanProgress.totalHosts
@@ -226,7 +227,7 @@ class MockScannerClient {
 			mockScanProgress.foundDevices = Math.floor(mockScanProgress.scannedHosts / 60);
 
 			if (mockScanProgress.scannedHosts >= mockScanProgress.totalHosts) {
-				mockScanProgress.status = 'completed';
+				mockScanProgress.status = ScanStatus.Completed;
 				mockScanProgress.scannedHosts = mockScanProgress.totalHosts;
 			}
 		}
@@ -236,13 +237,13 @@ class MockScannerClient {
 
 	async pauseScan(): Promise<void> {
 		if (mockScanProgress) {
-			mockScanProgress.status = 'paused';
+			mockScanProgress.status = ScanStatus.Paused;
 		}
 	}
 
 	async resumeScan(): Promise<void> {
 		if (mockScanProgress) {
-			mockScanProgress.status = 'running';
+			mockScanProgress.status = ScanStatus.Running;
 		}
 	}
 
@@ -260,7 +261,7 @@ class MockScannerClient {
 			config: {
 				targetRange: '192.168.1.0/24',
 				ports: 'top100',
-				scanType: 'comprehensive',
+				scanType: ScanMethod.Comprehensive,
 				timeout: 2000,
 				concurrency: 50,
 				enableOsDetection: true,
