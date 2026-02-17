@@ -20,7 +20,7 @@ pub enum ScanEvent {
         current: Option<String>,
     },
     /// Device discovered
-    DeviceFound(Device),
+    DeviceFound(Box<Device>),
     /// Scan completed
     Completed,
     /// Scan error
@@ -61,9 +61,20 @@ impl ScannerEngine {
         
         // Determine ports to scan
         let ports: Vec<u16> = match &self.config.ports {
-            crate::models::PortSelection::Named(crate::models::PortSelectionNamed::Top100) => crate::models::port::TOP_PORTS[..20].to_vec(), // Scan fewer for speed
-            crate::models::PortSelection::Named(crate::models::PortSelectionNamed::Top1000) => crate::models::port::TOP_PORTS[..50].to_vec(),
-            crate::models::PortSelection::Named(crate::models::PortSelectionNamed::All) => (1..=1000).collect(), // Cap at 1000 for performance
+            crate::models::PortSelection::Named(crate::models::PortSelectionNamed::Top100) => {
+                crate::models::port::TOP_PORTS.to_vec()
+            }
+            crate::models::PortSelection::Named(crate::models::PortSelectionNamed::Top1000) => {
+                // Extend TOP_PORTS with additional common ports up to 1000
+                let mut extended = crate::models::port::TOP_PORTS.to_vec();
+                extended.extend(1000..=5000);
+                extended.sort_unstable();
+                extended.dedup();
+                extended
+            }
+            crate::models::PortSelection::Named(crate::models::PortSelectionNamed::All) => {
+                (1..=10000).collect() // Cap at 10k for performance
+            }
             crate::models::PortSelection::Custom(p) => p.clone(),
         };
         
@@ -112,7 +123,7 @@ impl ScannerEngine {
                 
                 // Scan ports for online hosts
                 let open_ports = if is_online {
-                    tcp_scan_ports(&ip.to_string(), &ports, timeout).await
+                    tcp_scan_ports(&ip.to_string(), &ports, timeout, 10).await
                 } else {
                     Vec::new()
                 };
@@ -155,7 +166,7 @@ impl ScannerEngine {
                     
                     // Send event
                     if let Some(tx) = event_tx {
-                        let _ = tx.send(ScanEvent::DeviceFound(device)).await;
+                        let _ = tx.send(ScanEvent::DeviceFound(Box::new(device))).await;
                         let _ = tx.send(ScanEvent::Progress {
                             scanned: current_scanned,
                             total: total_hosts,
@@ -217,34 +228,42 @@ async fn quick_ping_check(ip: Ipv4Addr) -> bool {
     }
 }
 
-async fn tcp_scan_ports(host: &str, ports: &[u16], timeout: Duration) -> Vec<Port> {
+async fn tcp_scan_ports(host: &str, ports: &[u16], timeout: Duration, concurrency: usize) -> Vec<Port> {
     use std::net::TcpStream;
-    
-    let mut open_ports = Vec::new();
-    
+    use tokio::sync::Semaphore;
+
+    let semaphore = Arc::new(Semaphore::new(concurrency));
+    let mut tasks = JoinSet::new();
+
     for &port in ports {
+        let permit = semaphore.clone().acquire_owned().await.ok();
         let addr = format!("{}:{}", host, port);
-        
-        match tokio::time::timeout(
-            timeout,
-            tokio::task::spawn_blocking({
-                let addr = addr.clone();
-                let timeout = timeout;
-                move || {
+
+        tasks.spawn(async move {
+            let _permit = permit;
+            match tokio::time::timeout(
+                timeout,
+                tokio::task::spawn_blocking(move || {
                     TcpStream::connect_timeout(
                         &addr.parse().ok()?,
                         timeout,
                     ).ok()
-                }
-            })
-        ).await {
-            Ok(Ok(Some(_))) => {
-                open_ports.push(Port::open_tcp(port));
+                })
+            ).await {
+                Ok(Ok(Some(_))) => Some(Port::open_tcp(port)),
+                _ => None,
             }
-            _ => {}
+        });
+    }
+
+    let mut open_ports = Vec::new();
+    while let Some(result) = tasks.join_next().await {
+        if let Ok(Some(port)) = result {
+            open_ports.push(port);
         }
     }
-    
+
+    open_ports.sort_by_key(|p| p.number);
     open_ports
 }
 

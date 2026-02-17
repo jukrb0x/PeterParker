@@ -1,31 +1,21 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum PortState {
     Open,
+    #[default]
     Closed,
     Filtered,
 }
 
-impl Default for PortState {
-    fn default() -> Self {
-        Self::Closed
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub enum Protocol {
     #[serde(rename = "tcp")]
+    #[default]
     Tcp,
     #[serde(rename = "udp")]
     Udp,
-}
-
-impl Default for Protocol {
-    fn default() -> Self {
-        Self::Tcp
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

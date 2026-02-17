@@ -52,9 +52,9 @@ impl IpRange {
         let base = u32::from(self.network);
         let host_count = 2u32.pow(32 - self.prefix as u32);
         
-        (1..host_count.saturating_sub(1)).filter_map(move |offset| {
+        (1..host_count.saturating_sub(1)).map(move |offset| {
             // Skip network and broadcast addresses
-            Some(Ipv4Addr::from(base + offset))
+            Ipv4Addr::from(base + offset)
         })
     }
 }

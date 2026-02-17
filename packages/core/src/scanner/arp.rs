@@ -321,5 +321,5 @@ pub async fn arp_ping(ip: Ipv4Addr) -> Result<String, Box<dyn std::error::Error 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // ARP tests would go here
 }

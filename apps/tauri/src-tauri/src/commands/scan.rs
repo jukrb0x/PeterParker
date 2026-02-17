@@ -24,7 +24,7 @@ pub async fn start_scan(
     let total_hosts = range.size();
     
     // Initialize progress
-    let progress = ScanProgress::new(scan_id.clone(), total_hosts as u32);
+    let progress = ScanProgress::new(scan_id.clone(), total_hosts);
     scan_store.insert(scan_id.clone(), (progress, None));
     
     // Create event channel
@@ -74,20 +74,20 @@ pub async fn start_scan(
                             }));
                         }
                         ScanEvent::DeviceFound(device) => {
-                            devices.push(device.clone());
-                            
+                            devices.push((*device).clone());
+
                             // Add to device store
                             let mut store = device_store_clone.write().await;
                             if let Some(existing) = store.iter_mut().find(|d| d.ip == device.ip) {
-                                *existing = device.clone();
+                                *existing = (*device).clone();
                             } else {
-                                store.push(device.clone());
+                                store.push((*device).clone());
                             }
-                            
+
                             // Emit event to frontend
                             let _ = app.emit("device-found", serde_json::json!({
                                 "scanId": scan_id_clone.clone(),
-                                "device": device,
+                                "device": *device,
                             }));
                         }
                         ScanEvent::Completed => {

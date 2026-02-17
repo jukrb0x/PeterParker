@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use super::{OperatingSystem, Port, DeviceMetadata};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DeviceType {
     Router,
@@ -20,13 +20,8 @@ pub enum DeviceType {
     Tv,
     GameConsole,
     Server,
+    #[default]
     Unknown,
-}
-
-impl Default for DeviceType {
-    fn default() -> Self {
-        Self::Unknown
-    }
 }
 
 impl std::fmt::Display for DeviceType {
@@ -103,9 +98,7 @@ impl Device {
             self.device_type = DeviceType::Router;
         } else if has_print {
             self.device_type = DeviceType::Printer;
-        } else if has_rdp {
-            self.device_type = DeviceType::Desktop;
-        } else if has_smb {
+        } else if has_rdp || has_smb {
             self.device_type = DeviceType::Desktop;
         } else if has_ssh && has_http {
             self.device_type = DeviceType::Server;

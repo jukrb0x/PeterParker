@@ -13,7 +13,6 @@ pub fn detect_os_from_ttl(ttl: u8) -> OperatingSystem {
         0..=64 => ("Linux/macOS", "linux", 70),
         65..=128 => ("Windows", "windows", 85),
         129..=255 => ("Network Device", "embedded", 60),
-        _ => ("Unknown", "unknown", 0),
     };
     
     OperatingSystem {
@@ -26,7 +25,7 @@ pub fn detect_os_from_ttl(ttl: u8) -> OperatingSystem {
 }
 
 /// Detect OS from HTTP headers and banner
-pub fn detect_os_from_http_headers(server: &str, title: &str) -> Option<OperatingSystem> {
+pub fn detect_os_from_http_headers(server: &str, _title: &str) -> Option<OperatingSystem> {
     let server_lower = server.to_lowercase();
     
     if server_lower.contains("microsoft-iis") {
