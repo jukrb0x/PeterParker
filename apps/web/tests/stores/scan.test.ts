@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { scanStore } from '$lib/stores/scan.svelte';
 import { scannerClient } from '$lib/scanner/client';
+import { ScanStatus, ScanMethod } from '$lib/scanner/types';
 
 // Mock scanner client
 vi.mock('$lib/scanner/client', () => ({
@@ -8,7 +9,7 @@ vi.mock('$lib/scanner/client', () => ({
 		startScan: vi.fn().mockResolvedValue('test-scan-id'),
 		getScanProgress: vi.fn().mockResolvedValue({
 			scanId: 'test-scan-id',
-			status: 'completed',
+			status: ScanStatus.Completed,
 			totalHosts: 254,
 			scannedHosts: 254,
 			foundDevices: 5,
@@ -34,7 +35,7 @@ describe('scanStore', () => {
 		const config = {
 			targetRange: '192.168.1.0/24',
 			ports: 'top100' as const,
-			scanType: 'comprehensive' as const,
+			scanType: ScanMethod.Comprehensive,
 			timeout: 2000,
 			concurrency: 50,
 			enableOsDetection: true,
@@ -42,7 +43,7 @@ describe('scanStore', () => {
 		};
 
 		await scanStore.start(config);
-		
+
 		expect(scanStore.scanId).toBe('test-scan-id');
 		expect(scannerClient.startScan).toHaveBeenCalledWith(config);
 	});
@@ -50,7 +51,7 @@ describe('scanStore', () => {
 	it('calculates progress percentage', () => {
 		scanStore.progress = {
 			scanId: 'test',
-			status: 'running' as const,
+			status: ScanStatus.Running,
 			totalHosts: 100,
 			scannedHosts: 50,
 			foundDevices: 5,
@@ -64,7 +65,7 @@ describe('scanStore', () => {
 
 	it('resets state', () => {
 		scanStore.reset();
-		
+
 		expect(scanStore.scanId).toBeNull();
 		expect(scanStore.progress).toBeNull();
 		expect(scanStore.error).toBeNull();

@@ -1,4 +1,5 @@
 import type { Device, ScanConfig, ScanProgress, ScanResult } from './types';
+import { DeviceType, PortState, ScanStatus, ScanMethod } from './types';
 
 /**
  * Mock scanner client for web-only development (without Rust backend)
@@ -12,11 +13,11 @@ const MOCK_DEVICES: Device[] = [
 		vendor: 'TP-Link',
 		hostname: 'Router',
 		os: { name: 'Linux', family: 'linux', version: null, confidence: 90, cpe: [] },
-		deviceType: 'router',
+		deviceType: DeviceType.Router,
 		firstSeen: new Date().toISOString(),
 		lastSeen: new Date().toISOString(),
 		isOnline: true,
-		ports: [{ number: 80, protocol: 'tcp', state: 'open', service: { name: 'http', version: null, product: null, extraInfo: {} }, banner: null }],
+		ports: [{ number: 80, protocol: 'tcp', state: PortState.Open, service: { name: 'http', version: null, product: null, extraInfo: {} }, banner: null }],
 		metadata: { httpTitle: 'TP-LINK Router', httpServer: 'nginx', sshVersion: null, smbInfo: null, ttl: 64, windowSize: null }
 	},
 	{
@@ -26,11 +27,11 @@ const MOCK_DEVICES: Device[] = [
 		vendor: 'Apple',
 		hostname: 'MacBook-Pro',
 		os: { name: 'macOS', family: 'macos', version: '14.0', confidence: 95, cpe: [] },
-		deviceType: 'laptop',
+		deviceType: DeviceType.Laptop,
 		firstSeen: new Date().toISOString(),
 		lastSeen: new Date().toISOString(),
 		isOnline: true,
-		ports: [{ number: 22, protocol: 'tcp', state: 'open', service: { name: 'ssh', version: '9.0', product: 'OpenSSH', extraInfo: {} }, banner: null }],
+		ports: [{ number: 22, protocol: 'tcp', state: PortState.Open, service: { name: 'ssh', version: '9.0', product: 'OpenSSH', extraInfo: {} }, banner: null }],
 		metadata: { httpTitle: null, httpServer: null, sshVersion: 'OpenSSH_9.0', smbInfo: null, ttl: 64, windowSize: null }
 	},
 	{
@@ -40,7 +41,7 @@ const MOCK_DEVICES: Device[] = [
 		vendor: 'Xiaomi',
 		hostname: 'Redmi-Phone',
 		os: { name: 'Android', family: 'linux', version: '14', confidence: 80, cpe: [] },
-		deviceType: 'mobile',
+		deviceType: DeviceType.Mobile,
 		firstSeen: new Date().toISOString(),
 		lastSeen: new Date(Date.now() - 3600000).toISOString(),
 		isOnline: false,
@@ -58,7 +59,7 @@ class MockScannerClient {
 		const scanId = 'mock-scan-' + Date.now();
 		const progress: ScanProgress = {
 			scanId,
-			status: 'running',
+			status: ScanStatus.Running,
 			totalHosts: 254,
 			scannedHosts: 0,
 			foundDevices: 0,
@@ -70,28 +71,28 @@ class MockScannerClient {
 
 		// Simulate scan progress
 		setTimeout(() => this.simulateScan(scanId), 100);
-		
+
 		return scanId;
 	}
 
 	private async simulateScan(scanId: string) {
 		const progress = this.scanProgress.get(scanId)!;
-		
+
 		for (let i = 0; i <= 10; i++) {
 			await new Promise(r => setTimeout(r, 500));
 			progress.scannedHosts = Math.floor((i / 10) * 254);
 			progress.foundDevices = Math.floor((i / 10) * this.devices.length);
 			progress.eta = Math.floor((10 - i) * 0.5);
 		}
-		
-		progress.status = 'completed';
+
+		progress.status = ScanStatus.Completed;
 		progress.scannedHosts = 254;
 		progress.foundDevices = this.devices.length;
 		progress.eta = null;
-		
+
 		this.scanResults.set(scanId, {
 			scanId,
-			config: { targetRange: '192.168.1.0/24', ports: 'top100', scanType: 'comprehensive', timeout: 2000, concurrency: 50, enableOsDetection: true, enableServiceDetection: true },
+			config: { targetRange: '192.168.1.0/24', ports: 'top100', scanType: ScanMethod.Comprehensive, timeout: 2000, concurrency: 50, enableOsDetection: true, enableServiceDetection: true },
 			devices: this.devices,
 			startedAt: new Date().toISOString(),
 			completedAt: new Date().toISOString()
@@ -101,7 +102,7 @@ class MockScannerClient {
 	async getScanProgress(scanId: string): Promise<ScanProgress> {
 		return this.scanProgress.get(scanId) ?? {
 			scanId,
-			status: 'error',
+			status: ScanStatus.Error,
 			totalHosts: 0,
 			scannedHosts: 0,
 			foundDevices: 0,
@@ -118,7 +119,7 @@ class MockScannerClient {
 	async getScanResult(scanId: string): Promise<ScanResult> {
 		return this.scanResults.get(scanId) ?? {
 			scanId,
-			config: { targetRange: '192.168.1.0/24', ports: 'top100', scanType: 'comprehensive', timeout: 2000, concurrency: 50, enableOsDetection: true, enableServiceDetection: true },
+			config: { targetRange: '192.168.1.0/24', ports: 'top100', scanType: ScanMethod.Comprehensive, timeout: 2000, concurrency: 50, enableOsDetection: true, enableServiceDetection: true },
 			devices: [],
 			startedAt: new Date().toISOString(),
 			completedAt: null

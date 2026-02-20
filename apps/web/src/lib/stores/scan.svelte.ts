@@ -3,7 +3,8 @@
  * Manages active scan state and progress
  */
 
-import type { ScanConfig, ScanProgress, ScanStatus, ScanResult, Device } from '$lib/scanner/types';
+import type { ScanConfig, ScanProgress, ScanResult, Device } from '$lib/scanner/types';
+import { ScanStatus } from '$lib/scanner/types';
 import { scannerClient } from '$lib/scanner/client';
 import { devicesStore } from './devices.svelte';
 import { browser } from '$app/environment';
@@ -22,8 +23,8 @@ class ScanStore {
 	error = $state<string | null>(null);
 
 	// Derived states
-	isScanning = $derived(this.progress?.status === 'running');
-	isPaused = $derived(this.progress?.status === 'paused');
+	isScanning = $derived(this.progress?.status === ScanStatus.Running);
+	isPaused = $derived(this.progress?.status === ScanStatus.Paused);
 	progressPercent = $derived(
 		this.progress && this.progress.totalHosts > 0
 			? Math.round((this.progress.scannedHosts / this.progress.totalHosts) * 100)
@@ -75,7 +76,7 @@ class ScanStore {
 				
 				this.progress = {
 					scanId: event.payload.scanId,
-					status: 'running',
+					status: ScanStatus.Running,
 					totalHosts: event.payload.total,
 					scannedHosts: event.payload.scanned,
 					foundDevices: event.payload.found,
@@ -137,7 +138,7 @@ class ScanStore {
 		try {
 			await scannerClient.pauseScan(this.scanId);
 			if (this.progress) {
-				this.progress = { ...this.progress, status: 'paused' };
+				this.progress = { ...this.progress, status: ScanStatus.Paused };
 			}
 		} catch (e) {
 			this.error = e instanceof Error ? e.message : 'Failed to pause scan';
@@ -149,7 +150,7 @@ class ScanStore {
 		try {
 			await scannerClient.resumeScan(this.scanId);
 			if (this.progress) {
-				this.progress = { ...this.progress, status: 'running' };
+				this.progress = { ...this.progress, status: ScanStatus.Running };
 			}
 		} catch (e) {
 			this.error = e instanceof Error ? e.message : 'Failed to resume scan';
@@ -195,12 +196,12 @@ class ScanStore {
 
 			// Auto-stop polling on completion
 			if (
-				this.progress.status === 'completed' ||
-				this.progress.status === 'error'
+				this.progress.status === ScanStatus.Completed ||
+				this.progress.status === ScanStatus.Error
 			) {
 				this.stopPolling();
 				this.cleanupEventListeners();
-				if (this.progress.status === 'completed') {
+				if (this.progress.status === ScanStatus.Completed) {
 					await this.loadResult();
 				}
 			}
