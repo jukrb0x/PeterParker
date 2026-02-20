@@ -5,6 +5,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Wifi, Search, Grid3X3, List, Network, Settings, Play, Pause, Square, RefreshCw, Download, ChevronDown } from 'lucide-svelte';
 	import { TopologyCanvas } from '$lib/components/topology';
+	import { DeviceIcon } from '$lib/components/icons';
 
 	// View state
 	let viewMode = $state<'grid' | 'list' | 'topology'>('grid');
@@ -88,22 +89,6 @@
 		{ value: 'nas', label: 'NAS' },
 		{ value: 'unknown', label: 'Unknown' }
 	];
-
-	const deviceIcons: Record<string, string> = {
-		router: '◈',
-		desktop: '▣',
-		laptop: '▣',
-		mobile: '◎',
-		tablet: '◎',
-		iot: '◇',
-		printer: '▣',
-		nas: '▣',
-		camera: '◉',
-		tv: '▣',
-		game_console: '▣',
-		server: '◈',
-		unknown: '○'
-	};
 </script>
 
 <svelte:head>
@@ -293,7 +278,9 @@
 				{#each devices as device (device.id)}
 					<button class="device-card" onclick={() => goto(`/device/${encodeURIComponent(device.ip)}`)}>
 						<div class="card-header">
-							<span class="device-icon">{deviceIcons[device.deviceType] || '○'}</span>
+							<div class="device-icon" class:online={device.isOnline}>
+								<DeviceIcon type={device.deviceType} size={24} color={device.isOnline ? '#00d4ff' : '#666'} />
+							</div>
 							<span class="device-status" class:online={device.isOnline}></span>
 						</div>
 						<div class="card-body">
@@ -721,9 +708,19 @@
 	}
 
 	.device-icon {
-		font-size: 24px;
-		color: #00d4ff;
-		opacity: 0.8;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 36px;
+		height: 36px;
+		background: #0a0a0d;
+		border-radius: 8px;
+		border: 1px solid #1a1a1f;
+	}
+
+	.device-icon.online {
+		border-color: rgba(0, 212, 255, 0.3);
+		background: rgba(0, 212, 255, 0.05);
 	}
 
 	.device-status {
